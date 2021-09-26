@@ -116,6 +116,10 @@ async def callback_query_handler(callback_query: types.CallbackQuery, state: FSM
                 await callback_query.answer()
                 return
 
+            user['ashyq']['access_token']  = _ashyq.access_token
+            user['ashyq']['refresh_token'] = _ashyq.refresh_token
+            db.edit_user(user['user_id'], user)
+
             await callback_query.message.edit_text(
                 texts['ashyq'].format(
                     phone_number       = _ashyq.phone_number,
@@ -173,6 +177,10 @@ async def status_command_handler(message: types.Message):
         )
 
         return
+
+    user['ashyq']['access_token']  = _ashyq.access_token
+    user['ashyq']['refresh_token'] = _ashyq.refresh_token
+    db.edit_user(user['user_id'], user)
 
     await message.answer(
         texts['ashyq'].format(
