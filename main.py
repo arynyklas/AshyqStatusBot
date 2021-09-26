@@ -277,8 +277,10 @@ async def process_mailing_handler(message: types.Message, state: FSMContext):
     await AdminForm.mailing_forward.set()
 
     await message.answer(
-        texts['set_mailing_foward'],
-        reply_markup=keyboards.cancel
+        texts['set_mailing_foward'].format(
+            yes_words = '/'.join(yes_words)
+        ),
+        reply_markup  = keyboards.cancel
     )
 
 
