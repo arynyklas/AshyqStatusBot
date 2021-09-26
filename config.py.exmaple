@@ -3,6 +3,10 @@ bot_token = ''
 db_uri = 'mongodb://localhost:27017'
 db_name = ''
 
+owners = [
+
+]
+
 texts = {
     'start': 'Привет ✌️\nC моей помощью ты можешь подключить и получать статус о ПЦР тесте для твоего Ashyq аккаунта.\nПросто нажми кнопку ниже чтобы посмотреть свой статус, или же напиши /status.',
     'enter_phone_number': 'Для начала отправьте свой номер телефона в формате +7:',
@@ -16,6 +20,10 @@ texts = {
 
     'not_understand': 'Не понимаю :(',
     'cancelled': 'Отменено!',
+
+    'send_mailing_message': 'Отправьте сообщение рассылки:',
+    'mailing_started': 'Рассылка началась!',
+    'mailing_stats': 'Статистика рассылки:\nОбщее: <code>{total}</code>\nОтправлено: <code>{sent}</code>\nНе отправлено: <code>{unsent}</code>\nЗакончено за: <code>{time} секунд(-ы)</code>',
 
     'keyboards': {
         'status': 'Статус',

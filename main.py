@@ -6,7 +6,9 @@ from aiogram.contrib.fsm_storage.mongo import MongoStorage
 from aiogram.dispatcher.handler import CancelHandler
 from db import DataBase
 from keyboards import Keyboards
-from config import bot_token, db_uri, db_name, texts, chars
+from time import time
+from asyncio import sleep
+from config import bot_token, db_uri, db_name, owners, texts, chars
 
 import ashyq
 
@@ -18,10 +20,15 @@ dp = Dispatcher(bot, storage=MongoStorage(db_name=db_name, uri=db_uri))
 
 keyboards = Keyboards(texts['keyboards'])
 
+owners_filter = filters.IDFilter(owners)
+
 
 class AshyqForm(StatesGroup):
     phone_number = State()
     sms_code = State()
+
+class AdminForm(StatesGroup):
+    mailing = State()
 
 
 class Middleware(BaseMiddleware):
@@ -39,8 +46,6 @@ class Middleware(BaseMiddleware):
             user = db.get_user(message.from_user.id)
 
         if not user['ashyq'] and not await dp.current_state(user=user['user_id']).get_state():
-            db.add_user(message.from_user.id)
-
             await AshyqForm.phone_number.set()
 
             await message.answer(
@@ -70,8 +75,6 @@ async def callback_query_handler(callback_query: types.CallbackQuery, state: FSM
     elif args[0] == 'menu':
         if not user['ashyq'] and not await dp.current_state(user=user['user_id']).get_state():
             await callback_query.message.delete()
-
-            db.add_user(callback_query.from_user.id)
 
             await AshyqForm.phone_number.set()
 
@@ -252,6 +255,53 @@ async def enter_sms_code_handler(message: types.Message, state: FSMContext):
     db.edit_user(user['user_id'], user)
 
     await message.answer(texts['account_tied'], reply_markup=keyboards.to_menu)
+
+
+@dp.message_handler(owners_filter, commands=['mailing'])
+async def mailing_command_handler(message: types.Message):
+    await AdminForm.mailing.set()
+
+    await message.answer(
+        texts['send_mailing_message'],
+        reply_markup=keyboards.cancel
+    )
+
+
+@dp.message_handler(content_types=types.ContentType.ANY, state=AdminForm.mailing)
+async def process_mailing_handler(message: types.Message, state: FSMContext):
+    total = 0
+    sent = 0
+    unsent = 0
+
+    await state.finish()
+    await message.answer(texts['mailing_started'])
+
+    start = time()
+
+    for user in db.get_user():
+        try:
+            await message.copy_to(
+                user['user_id'],
+                reply_markup=keyboards.to_menu
+            )
+
+            sent += 1
+
+        except:
+            unsent += 1
+
+        total += 1
+
+        await sleep(0.04)
+
+    await message.reply(
+        texts['mailing_stats'].format(
+            total=total,
+            sent=sent,
+            unsent=unsent,
+            time=round(time() - start, 2)
+        )
+    )
 
 
 @dp.message_handler(content_types=types.ContentType.ANY, state='*')

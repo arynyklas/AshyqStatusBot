@@ -5,9 +5,9 @@ from typing import Optional, Union, Dict
 
 
 class DataBase:
-    def __init__(self, db_url: str, db_name: str):
+    def __init__(self, db_uri: str, db_name: str):
         try:
-            self.client = MongoClient(db_url, connect=False)
+            self.client = MongoClient(db_uri, connect=False)
         except errors.ConnectionFailure:
             exit('Can\'t connect to server!')
 
