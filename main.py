@@ -8,7 +8,7 @@ from db import DataBase
 from keyboards import Keyboards
 from time import time
 from asyncio import sleep
-from config import bot_token, db_uri, db_name, owners, texts, chars
+from config import bot_token, db_uri, db_name, owners, texts, yes_words, chars
 
 import ashyq
 
@@ -29,6 +29,7 @@ class AshyqForm(StatesGroup):
 
 class AdminForm(StatesGroup):
     mailing = State()
+    mailing_forward = State()
 
 
 class Middleware(BaseMiddleware):
@@ -257,8 +258,10 @@ async def enter_sms_code_handler(message: types.Message, state: FSMContext):
     await message.answer(texts['account_tied'], reply_markup=keyboards.to_menu)
 
 
-@dp.message_handler(owners_filter, commands=['mailing'])
-async def mailing_command_handler(message: types.Message):
+@dp.message_handler(owners_filter, commands=['mailing'], state='*')
+async def mailing_command_handler(message: types.Message, state: FSMContext):
+    await state.finish()
+
     await AdminForm.mailing.set()
 
     await message.answer(
@@ -269,9 +272,35 @@ async def mailing_command_handler(message: types.Message):
 
 @dp.message_handler(content_types=types.ContentType.ANY, state=AdminForm.mailing)
 async def process_mailing_handler(message: types.Message, state: FSMContext):
+    await state.set_data({'message': message.to_python()})
+
+    await AdminForm.mailing_forward.set()
+
+    await message.answer(
+        texts['set_mailing_foward'],
+        reply_markup=keyboards.cancel
+    )
+
+
+@dp.message_handler(content_types=types.ContentType.ANY, state=AdminForm.mailing_forward)
+async def process_mailing_forward_handler(message: types.Message, state: FSMContext):
     total = 0
     sent = 0
     unsent = 0
+
+    message_text = message.text.lower()
+
+    data = await state.get_data()
+    _message = types.Message.to_object(data['message'])
+
+    is_forward = False
+
+    for word in yes_words:
+        if message_text == word:
+            is_forward = True
+
+    func = _message.forward if is_forward else _message.copy_to
+    kwargs = {} if is_forward else {'reply_markup': keyboards.to_menu}
 
     await state.finish()
     await message.answer(texts['mailing_started'])
@@ -279,11 +308,10 @@ async def process_mailing_handler(message: types.Message, state: FSMContext):
     start = time()
 
     for user in db.get_user():
+        kwargs['chat_id'] = user['user_id']
+
         try:
-            await message.copy_to(
-                user['user_id'],
-                reply_markup=keyboards.to_menu
-            )
+            await func(**kwargs)
 
             sent += 1
 
@@ -294,7 +322,7 @@ async def process_mailing_handler(message: types.Message, state: FSMContext):
 
         await sleep(0.04)
 
-    await message.reply(
+    await _message.reply(
         texts['mailing_stats'].format(
             total=total,
             sent=sent,
