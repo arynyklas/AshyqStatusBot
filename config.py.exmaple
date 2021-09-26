@@ -22,9 +22,9 @@ texts = {
     'cancelled': 'Отменено!',
 
     'send_mailing_message': 'Отправьте сообщение рассылки:',
+    'set_mailing_foward': 'Переслать? ({yes_words} для перессылки)',
     'mailing_started': 'Рассылка началась!',
     'mailing_stats': 'Статистика рассылки:\nОбщее: <code>{total}</code>\nОтправлено: <code>{sent}</code>\nНе отправлено: <code>{unsent}</code>\nЗакончено за: <code>{time} секунд(-ы)</code>',
-    'set_mailing_foward': 'Переслать? (да/yes для перессылки)',
 
     'keyboards': {
         'status': 'Статус',
