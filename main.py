@@ -235,7 +235,7 @@ async def callback_query_handler(callback_query: types.CallbackQuery, state: FSM
                 await bot.edit_message_text(
                     text,
                     inline_message_id = callback_query.inline_message_id,
-                    reply_markup      = keyboards.ashyq
+                    reply_markup      = keyboards.ashyq_inline(callback_query.from_user.id)
                 )
 
             else:
