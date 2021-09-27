@@ -8,7 +8,10 @@ from db import DataBase
 from keyboards import Keyboards
 from time import time
 from asyncio import sleep
-from config import bot_token, db_uri, db_name, owners, texts, yes_words, chars
+from utils import is_phone_number, is_sms_code
+from config import (
+    bot_token, db_uri, db_name, owners,
+    texts, yes_words, chars, phone_codes)
 
 import ashyq
 
@@ -204,6 +207,16 @@ async def status_command_handler(message: types.Message):
 async def enter_phone_number_handler(message: types.Message, state: FSMContext):
     phone_number = message.text
 
+    if not is_phone_number(phone_number, phone_codes):
+        await state.finish()
+
+        await message.answer(
+            texts['incorrect_account'],
+            reply_markup=keyboards.to_menu
+        )
+
+        return
+
     _ashyq = ashyq.Ashyq(
         driver       = ashyq.drivers.sync.SyncDriver(),
         phone_number = phone_number
@@ -224,6 +237,16 @@ async def enter_phone_number_handler(message: types.Message, state: FSMContext):
 @dp.message_handler(state=AshyqForm.sms_code)
 async def enter_sms_code_handler(message: types.Message, state: FSMContext):
     sms_code = message.text
+
+    if not is_sms_code(sms_code):
+        await state.finish()
+
+        await message.answer(
+            texts['incorrect_account'],
+            reply_markup=keyboards.to_menu
+        )
+
+        return
 
     data = await state.get_data()
 
@@ -249,8 +272,8 @@ async def enter_sms_code_handler(message: types.Message, state: FSMContext):
     await state.finish()
 
     user = db.get_user(message.from_user.id)
-    user['ashyq']['device_id']     = data['device_id']
-    user['ashyq']['phone_number']  = data['phone_number']
+    user['ashyq']['device_id']     = _ashyq.device_id
+    user['ashyq']['phone_number']  = _ashyq.phone_number
     user['ashyq']['access_token']  = connect.access_token
     user['ashyq']['refresh_token'] = connect.refresh_token
     db.edit_user(user['user_id'], user)
@@ -284,7 +307,7 @@ async def process_mailing_handler(message: types.Message, state: FSMContext):
     )
 
 
-@dp.message_handler(content_types=types.ContentType.ANY, state=AdminForm.mailing_forward)
+@dp.message_handler(state=AdminForm.mailing_forward)
 async def process_mailing_forward_handler(message: types.Message, state: FSMContext):
     total = 0
     sent = 0
@@ -314,9 +337,7 @@ async def process_mailing_forward_handler(message: types.Message, state: FSMCont
 
         try:
             await func(**kwargs)
-
             sent += 1
-
         except:
             unsent += 1
 
