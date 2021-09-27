@@ -8,10 +8,10 @@ from db import DataBase
 from keyboards import Keyboards
 from time import time
 from asyncio import sleep
-from utils import is_phone_number, is_sms_code
+from utils import is_phone_number, is_sms_code, random_string
 from config import (
     bot_token, db_uri, db_name, owners,
-    texts, yes_words, chars, phone_codes)
+    texts, yes_words, chars)
 
 import ashyq
 
@@ -21,7 +21,7 @@ db = DataBase(db_uri, db_name)
 bot = Bot(bot_token, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot, storage=MongoStorage(db_name=db_name, uri=db_uri))
 
-keyboards = Keyboards(texts['keyboards'])
+keyboards: Keyboards
 
 owners_filter = filters.IDFilter(owners)
 
@@ -62,6 +62,94 @@ class Middleware(BaseMiddleware):
             raise CancelHandler
 
 
+async def on_startup(dp: Dispatcher):
+    global keyboards
+
+    keyboards = Keyboards(texts['keyboards'], await bot.me)
+
+async def on_shutdown(dp: Dispatcher):
+    await dp.storage.close()
+    await dp.storage.wait_closed()
+
+    db.client.close()
+
+
+@dp.inline_handler(state='*')
+async def inline_handler(inline_query: types.InlineQuery):
+    results = []
+
+    user = db.get_user(inline_query.from_user.id)
+
+    title = texts['pcr_test']
+
+    if not user or not user['ashyq']:
+        text = texts['account_not_tied']
+
+        results.append(
+            types.InlineQueryResultArticle(
+                id                    = random_string(64),
+                title                 = title,
+                input_message_content = types.InputTextMessageContent(text),
+                reply_markup          = keyboards.tie_account,
+                description           = text
+            )
+        )
+
+        cache_time = 30
+
+    else:
+        _ashyq = ashyq.Ashyq(
+            driver       = ashyq.drivers.sync.SyncDriver(),
+            phone_number = user['ashyq']['phone_number'],
+            device_id    = user['ashyq']['device_id']
+        )
+
+        _ashyq.access_token = user['ashyq']['access_token']
+        _ashyq.refresh_token = user['ashyq']['refresh_token']
+
+        try:
+            check: ashyq.types.Check = _ashyq.user_pcr()
+
+            text = texts['ashyq'].format(
+                phone_number       = _ashyq.phone_number,
+                char               = chars[check._pass],
+                status             = check.status,
+                status_description = check.status_description,
+                date               = check.date
+            )
+
+            results.append(
+                types.InlineQueryResultArticle(
+                    id                    = random_string(64),
+                    title                 = title,
+                    input_message_content = types.InputTextMessageContent(text),
+                    description           = text,
+                    #reply_markup          = keyboards.ashyq_inline(user['user_id'])
+                )
+            )
+
+            cache_time = 360
+
+        except ashyq.exceptions.AshyqException:
+            user['ashyq'] = {}
+            db.edit_user(user['user_id'], user)
+
+            text = texts['incorrect_account']
+
+            results.append(
+                types.InlineQueryResultArticle(
+                    id                    = random_string(64),
+                    title                 = title,
+                    input_message_content = types.InputTextMessageContent(text),
+                    description           = text
+                )
+            )
+
+            cache_time = 30
+
+    await inline_query.answer(results, cache_time=cache_time)
+
+
 @dp.callback_query_handler(state='*')
 async def callback_query_handler(callback_query: types.CallbackQuery, state: FSMContext):
     args = callback_query.data.split('_')
@@ -99,6 +187,13 @@ async def callback_query_handler(callback_query: types.CallbackQuery, state: FSM
 
     elif args[0] == 'ashyq':
         if args[1] == 'status':
+            if len(args) > 2:
+                user_id = int(args[2])
+
+                if callback_query.from_user.id != user_id:
+                    await callback_query.answer()
+                    return
+
             _ashyq = ashyq.Ashyq(
                 driver       = ashyq.drivers.sync.SyncDriver(),
                 phone_number = user['ashyq']['phone_number'],
@@ -128,6 +223,7 @@ async def callback_query_handler(callback_query: types.CallbackQuery, state: FSM
                 user['ashyq']['refresh_token'] = _ashyq.refresh_token
                 db.edit_user(user['user_id'], user)
 
+            # TODO: edit message if from comes inline mode
             await callback_query.message.edit_text(
                 texts['ashyq'].format(
                     phone_number       = _ashyq.phone_number,
@@ -140,9 +236,17 @@ async def callback_query_handler(callback_query: types.CallbackQuery, state: FSM
             )
 
         elif args[1] == 'untie':
+            if len(args) > 2:
+                user_id = int(args[2])
+
+                if callback_query.from_user.id != user_id:
+                    await callback_query.answer()
+                    return
+
             user['ashyq'] = {}
             db.edit_user(user['user_id'], user)
 
+            # TODO: edit message if from comes inline mode
             await callback_query.message.edit_text(
                 texts['account_untied'],
                 reply_markup=keyboards.to_menu
@@ -207,7 +311,7 @@ async def status_command_handler(message: types.Message):
 async def enter_phone_number_handler(message: types.Message, state: FSMContext):
     phone_number = message.text
 
-    if not is_phone_number(phone_number, phone_codes):
+    if not is_phone_number(phone_number):
         await state.finish()
 
         await message.answer(
@@ -360,8 +464,13 @@ async def any_handler(message: types.Message, state: FSMContext):
     await message.answer(texts['not_understand'])
 
 
+@dp.errors_handler(exception=exceptions.InvalidQueryID)
+async def query_errors_handler(update: types.Update, exception: exceptions.InvalidQueryID):
+    return True
+
+
 dp.middleware.setup(Middleware())
 
 
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=False)
+    executor.start_polling(dp, skip_updates=False, on_startup=on_startup, on_shutdown=on_shutdown)
