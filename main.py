@@ -124,11 +124,11 @@ async def inline_handler(inline_query: types.InlineQuery):
                     title                 = title,
                     input_message_content = types.InputTextMessageContent(text),
                     description           = text,
-                    #reply_markup          = keyboards.ashyq_inline(user['user_id'])
+                    reply_markup          = keyboards.ashyq_inline(user['user_id'])
                 )
             )
 
-            cache_time = 360
+            cache_time = 300
 
         except ashyq.exceptions.AshyqException:
             user['ashyq'] = {}
@@ -223,17 +223,26 @@ async def callback_query_handler(callback_query: types.CallbackQuery, state: FSM
                 user['ashyq']['refresh_token'] = _ashyq.refresh_token
                 db.edit_user(user['user_id'], user)
 
-            # TODO: edit message if from comes inline mode
-            await callback_query.message.edit_text(
-                texts['ashyq'].format(
-                    phone_number       = _ashyq.phone_number,
-                    char               = chars[check._pass],
-                    status             = check.status,
-                    status_description = check.status_description,
-                    date               = check.date
-                ),
-                reply_markup=keyboards.ashyq
+            text = texts['ashyq'].format(
+                phone_number       = _ashyq.phone_number,
+                char               = chars[check._pass],
+                status             = check.status,
+                status_description = check.status_description,
+                date               = check.date
             )
+
+            if callback_query.inline_message_id:
+                await bot.edit_message_text(
+                    text,
+                    inline_message_id = callback_query.inline_message_id,
+                    reply_markup      = keyboards.ashyq
+                )
+
+            else:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=keyboards.ashyq
+                )
 
         elif args[1] == 'untie':
             if len(args) > 2:
@@ -246,11 +255,18 @@ async def callback_query_handler(callback_query: types.CallbackQuery, state: FSM
             user['ashyq'] = {}
             db.edit_user(user['user_id'], user)
 
-            # TODO: edit message if from comes inline mode
-            await callback_query.message.edit_text(
-                texts['account_untied'],
-                reply_markup=keyboards.to_menu
-            )
+            if callback_query.inline_message_id:
+                await bot.edit_message_text(
+                    texts['account_untied'],
+                    inline_message_id = callback_query.inline_message_id,
+                    reply_markup      = keyboards.tie_account
+                )
+
+            else:
+                await callback_query.message.edit_text(
+                    texts['account_untied'],
+                    reply_markup=keyboards.to_menu
+                )
 
     await callback_query.answer()
 
