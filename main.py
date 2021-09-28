@@ -392,13 +392,30 @@ async def enter_sms_code_handler(message: types.Message, state: FSMContext):
     await state.finish()
 
     user = db.get_user(message.from_user.id)
-    user['ashyq']['device_id']     = _ashyq.device_id
-    user['ashyq']['phone_number']  = _ashyq.phone_number
-    user['ashyq']['access_token']  = connect.access_token
-    user['ashyq']['refresh_token'] = connect.refresh_token
+    user['ashyq'] = {
+        'device_id':     _ashyq.device_id,
+        'phone_number':  _ashyq.phone_number,
+        'access_token':  connect.access_token,
+        'refresh_token': connect.refresh_token
+    }
     db.edit_user(user['user_id'], user)
 
-    await message.answer(texts['account_tied'], reply_markup=keyboards.to_menu)
+    await message.answer(
+        texts['account_tied'],
+        reply_markup=keyboards.to_menu
+    )
+
+
+@dp.message_handler(owners_filter, commands=['users_count'])
+async def users_count_command_handler(message: types.Message):
+    users_count = db.get_users_count()
+
+    await message.answer(
+        texts['users_count'].format(
+            users_count = users_count
+        ),
+        reply_markup    = keyboards.to_menu
+    )
 
 
 @dp.message_handler(owners_filter, commands=['mailing'], state='*')

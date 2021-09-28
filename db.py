@@ -16,11 +16,14 @@ class DataBase:
     def add_user(self, user_id: int) -> str:
         return self.db.users.insert_one({'user_id': user_id, 'ashyq': {}}).inserted_id
 
-    def get_user(self, user_id: Optional[int]=None) -> Union[Cursor, Dict]:
+    def get_user(self, user_id: Optional[int]=None) -> Union[Cursor, dict]:
         if user_id:
             return self.db.users.find_one({'user_id': user_id})
 
         return self.db.users.find({})
+
+    def get_users_count(self) -> int:
+        return self.db.users.count_documents({})
 
     def edit_user(self, user_id: int, data: dict) -> int:
         return self.db.users.update_one({'user_id': user_id}, {'$set': data}).modified_count

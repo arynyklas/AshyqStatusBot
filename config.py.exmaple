@@ -23,6 +23,8 @@ texts = {
     'not_understand': 'Не понимаю :(',
     'cancelled': 'Отменено!',
 
+    'users_count': 'Кол-во пользователей: {users_count}',
+
     'send_mailing_message': 'Отправьте сообщение рассылки:',
     'set_mailing_foward': 'Переслать? ({yes_words} для перессылки)',
     'mailing_started': 'Рассылка началась!',
