@@ -187,12 +187,9 @@ async def callback_query_handler(callback_query: types.CallbackQuery, state: FSM
 
     elif args[0] == 'ashyq':
         if args[1] == 'status':
-            if len(args) > 2:
-                user_id = int(args[2])
-
-                if callback_query.from_user.id != user_id:
-                    await callback_query.answer()
-                    return
+            if len(args) > 2 and callback_query.from_user.id != int(args[2]):
+                await callback_query.answer()
+                return
 
             _ashyq = ashyq.Ashyq(
                 driver       = ashyq.drivers.sync.SyncDriver(),
@@ -206,51 +203,54 @@ async def callback_query_handler(callback_query: types.CallbackQuery, state: FSM
             try:
                 check: ashyq.types.Check = _ashyq.user_pcr()
 
+                if user['ashyq']['access_token'] != _ashyq.access_token:
+                    user['ashyq']['access_token']  = _ashyq.access_token
+                    user['ashyq']['refresh_token'] = _ashyq.refresh_token
+                    db.edit_user(user['user_id'], user)
+
+                text = texts['ashyq'].format(
+                    phone_number       = _ashyq.phone_number,
+                    char               = chars[check._pass],
+                    status             = check.status,
+                    status_description = check.status_description,
+                    date               = check.date
+                )
+
+                if callback_query.inline_message_id:
+                    await bot.edit_message_text(
+                        text,
+                        inline_message_id = callback_query.inline_message_id,
+                        reply_markup      = keyboards.ashyq_inline(callback_query.from_user.id)
+                    )
+
+                else:
+                    await callback_query.message.edit_text(
+                        text, reply_markup=keyboards.ashyq
+                    )
+
+
             except ashyq.exceptions.AshyqException:
                 user['ashyq'] = {}
                 db.edit_user(user['user_id'], user)
 
-                await callback_query.message.edit_text(
-                    texts['incorrect_account'],
-                    reply_markup=keyboards.to_menu
-                )
+                text = texts['incorrect_account']
 
-                await callback_query.answer()
-                return
+                if callback_query.inline_message_id:
+                    await bot.edit_message_text(
+                        text,
+                        inline_message_id = callback_query.inline_message_id,
+                        reply_markup      = keyboards.tie_account
+                    )
 
-            if user['ashyq']['access_token'] != _ashyq.access_token:
-                user['ashyq']['access_token']  = _ashyq.access_token
-                user['ashyq']['refresh_token'] = _ashyq.refresh_token
-                db.edit_user(user['user_id'], user)
-
-            text = texts['ashyq'].format(
-                phone_number       = _ashyq.phone_number,
-                char               = chars[check._pass],
-                status             = check.status,
-                status_description = check.status_description,
-                date               = check.date
-            )
-
-            if callback_query.inline_message_id:
-                await bot.edit_message_text(
-                    text,
-                    inline_message_id = callback_query.inline_message_id,
-                    reply_markup      = keyboards.ashyq_inline(callback_query.from_user.id)
-                )
-
-            else:
-                await callback_query.message.edit_text(
-                    text,
-                    reply_markup=keyboards.ashyq
-                )
+                else:
+                    await callback_query.message.edit_text(
+                        text, reply_markup=keyboards.to_menu
+                    )
 
         elif args[1] == 'untie':
-            if len(args) > 2:
-                user_id = int(args[2])
-
-                if callback_query.from_user.id != user_id:
-                    await callback_query.answer()
-                    return
+            if len(args) > 2 and callback_query.from_user.id != int(args[2]):
+                await callback_query.answer()
+                return
 
             user['ashyq'] = {}
             db.edit_user(user['user_id'], user)

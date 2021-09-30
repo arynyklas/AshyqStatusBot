@@ -1,7 +1,7 @@
 from pymongo import MongoClient, errors
 from pymongo.cursor import Cursor
 
-from typing import Optional, Union, Dict
+from typing import Optional, Union
 
 
 class DataBase:
